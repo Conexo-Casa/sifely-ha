@@ -1,0 +1,13 @@
+{
+  "domain": "sifely",
+  "name": "Sifely Smart Lock",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://github.com/Conexo-Casa/sifely-ha",
+  "issue_tracker": "https://github.com/Conexo-Casa/sifely-ha/issues",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": ["@Conexo-Casa"],
+  "iot_class": "cloud_polling",
+  "homeassistant": "2024.1.0"
+}
