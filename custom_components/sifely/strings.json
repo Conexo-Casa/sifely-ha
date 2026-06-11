@@ -3,31 +3,28 @@
     "step": {
       "user": {
         "title": "Sifely Smart Lock",
-        "description": "Enter your Sifely API credentials. Your Client ID and Client Secret can be obtained from the [Sifely API Access portal](https://app-smart-manager.sifely.com/Login.html).",
+        "description": "Enter your Sifely API credentials.\n\n**Client ID** and **Client Secret** come from the [Sifely API Access portal](https://app-smart-manager.sifely.com/Login.html) (the values shown after you register an app).\n\n**Username** and **Password** are your personal Sifely *account* login — the same ones you use in the Sifely mobile app.",
         "data": {
-          "client_id": "Client ID",
-          "username": "Username (email or phone)",
-          "password": "Password"
+          "client_id": "Client ID (from Sifely API portal)",
+          "client_secret": "Client Secret (from Sifely API portal)",
+          "username": "Sifely account username (email or phone)",
+          "password": "Sifely account password"
+        },
+        "data_description": {
+          "client_id": "Example: Conexo Casa",
+          "client_secret": "Example: YqWgWWpZ5G/aXto8uharkA==",
+          "username": "The email or phone number you use to log in to the Sifely app",
+          "password": "Your Sifely app password (never shared — stored securely in HA)"
         }
       }
     },
     "error": {
-      "invalid_auth": "Invalid credentials. Please check your Client ID, username, and password.",
-      "cannot_connect": "Unable to connect to the Sifely API. Please check your internet connection.",
-      "unknown": "An unexpected error occurred. Check the Home Assistant logs for details."
+      "invalid_auth": "Authentication failed. Check that your Client ID matches exactly what the Sifely portal shows, and that your username/password are correct.",
+      "cannot_connect": "Unable to reach the Sifely API. Check your internet connection.",
+      "unknown": "An unexpected error occurred — check the Home Assistant logs for details."
     },
     "abort": {
       "already_configured": "This Sifely account is already configured."
-    }
-  },
-  "entity": {
-    "lock": {
-      "sifely_lock": {
-        "state": {
-          "locked": "Locked",
-          "unlocked": "Unlocked"
-        }
-      }
     }
   }
 }
