@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Sifely Smart Lock",
-        "description": "Enter your Sifely API credentials.\n\n**Client ID** and **Client Secret** come from the [Sifely API Access portal](https://app-smart-manager.sifely.com/Login.html) (the values shown after you register an app).\n\n**Username** and **Password** are your personal Sifely *account* login — the same ones you use in the Sifely mobile app.",
+        "description": "Enter your Sifely API credentials.\n\n**Client ID** and **Client Secret** come from the [Sifely API Access portal](https://app-smart-manager.sifely.com/Login.html).\n\n**Username** and **Password** are your personal Sifely *account* credentials — the same ones you use in the Sifely mobile app.",
         "data": {
           "client_id": "Client ID (from Sifely API portal)",
           "client_secret": "Client Secret (from Sifely API portal)",
@@ -14,17 +14,35 @@
           "client_id": "Example: Conexo Casa",
           "client_secret": "Example: YqWgWWpZ5G/aXto8uharkA==",
           "username": "The email or phone number you use to log in to the Sifely app",
-          "password": "Your Sifely app password (never shared — stored securely in HA)"
+          "password": "Your Sifely app password"
         }
       }
     },
     "error": {
-      "invalid_auth": "Authentication failed. Check that your Client ID matches exactly what the Sifely portal shows, and that your username/password are correct.",
+      "invalid_auth": "Authentication failed. Check that your Client ID matches exactly what the Sifely portal shows, and that your username and password are correct.",
       "cannot_connect": "Unable to reach the Sifely API. Check your internet connection.",
       "unknown": "An unexpected error occurred — check the Home Assistant logs for details."
     },
     "abort": {
       "already_configured": "This Sifely account is already configured."
+    }
+  },
+  "services": {
+    "add_passcode": {
+      "name": "Add passcode",
+      "description": "Create a new guest passcode on a Sifely lock."
+    },
+    "change_passcode": {
+      "name": "Change passcode",
+      "description": "Update an existing passcode on a lock."
+    },
+    "delete_passcode": {
+      "name": "Delete passcode",
+      "description": "Remove a passcode from a lock."
+    },
+    "list_passcodes": {
+      "name": "List passcodes",
+      "description": "Retrieve all passcodes for a lock and log them."
     }
   }
 }
