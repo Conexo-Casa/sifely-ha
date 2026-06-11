@@ -1,0 +1,33 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sifely Smart Lock",
+        "description": "Enter your Sifely API credentials. Your Client ID and Client Secret can be obtained from the [Sifely API Access portal](https://app-smart-manager.sifely.com/Login.html).",
+        "data": {
+          "client_id": "Client ID",
+          "username": "Username (email or phone)",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid credentials. Please check your Client ID, username, and password.",
+      "cannot_connect": "Unable to connect to the Sifely API. Please check your internet connection.",
+      "unknown": "An unexpected error occurred. Check the Home Assistant logs for details."
+    },
+    "abort": {
+      "already_configured": "This Sifely account is already configured."
+    }
+  },
+  "entity": {
+    "lock": {
+      "sifely_lock": {
+        "state": {
+          "locked": "Locked",
+          "unlocked": "Unlocked"
+        }
+      }
+    }
+  }
+}
