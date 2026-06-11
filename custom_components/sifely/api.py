@@ -20,16 +20,21 @@ from .const import (
     API_LOCK_OPEN_STATE,
     API_LOCK_UNLOCK,
     API_LOGIN,
+    API_PASSCODE_ADD,
+    API_PASSCODE_CHANGE,
+    API_PASSCODE_DELETE,
+    API_PASSCODE_LIST,
     API_REFRESH_TOKEN,
     GRANT_TYPE_REFRESH,
+    PWD_TYPE_PERMANENT,
+    PWD_TYPE_TIMED,
+    REMOTE_OP_TYPE,
+    SIFELY_OK,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 15
-
-# Sifely returns code=200 in the JSON body on success (not code=0)
-SIFELY_OK = 200
 
 
 class SifelyAuthError(Exception):
@@ -49,22 +54,7 @@ class SifelyGatewayOfflineError(SifelyApiError):
 
 
 class SifelyClient:
-    """Async client for the Sifely Smart Lock API.
-
-    Login response shape (actual, from live API):
-    {
-        "code": 200,
-        "message": "Operation success!",
-        "data": {
-            "token":        "<JWT>",
-            "refreshToken": "<JWT>",
-            "expires_in":   "31536000"
-        }
-    }
-
-    All authenticated requests use:
-        Authorization: <token>    (no "Bearer" prefix — Sifely uses raw JWT)
-    """
+    """Async client for the Sifely Smart Lock API."""
 
     def __init__(
         self,
@@ -88,13 +78,11 @@ class SifelyClient:
     # ── Authentication ──────────────────────────────────────────────────────
 
     async def login(self) -> None:
-        """Perform a full username/password login and store tokens.
+        """Full username/password login.
 
-        Actual response uses:
-            data.token        → access token (raw JWT, no "Bearer" prefix needed)
-            data.refreshToken → refresh token
-            data.expires_in   → seconds as a string
-            code == 200       → success  (NOT 0)
+        Live response shape:
+            { "code": 200, "message": "Operation success!",
+              "data": { "token": "...", "refreshToken": "...", "expires_in": "31536000" } }
         """
         params = {
             "client_id": self._client_id,
@@ -102,7 +90,6 @@ class SifelyClient:
             "password":  self._password_md5,
         }
         _LOGGER.debug("Sifely login: client_id=%r username=%r", self._client_id, self._username)
-
         raw = await self._request("POST", API_LOGIN, params=params, auth=False)
         _LOGGER.debug("Sifely login response: %s", raw)
 
@@ -121,22 +108,18 @@ class SifelyClient:
             expires_in = 7200
 
         if not access:
-            raise SifelyAuthError(
-                f"Login returned code=200 but no token. data={data}"
-            )
+            raise SifelyAuthError(f"Login returned code=200 but no token. data={data}")
 
-        self._access_token      = access
-        self._refresh_token     = refresh
-        self._token_expires_at  = time.monotonic() + expires_in - 60
-        _LOGGER.debug("Sifely login OK, token expires in %ds", expires_in)
+        self._access_token     = access
+        self._refresh_token    = refresh
+        self._token_expires_at = time.monotonic() + expires_in - 60
+        _LOGGER.debug("Sifely login OK, expires in %ds", expires_in)
 
     async def _refresh_access_token(self) -> None:
-        """Use refresh_token to obtain a new access_token."""
         if not self._refresh_token:
             _LOGGER.warning("No refresh token — performing full re-login")
             await self.login()
             return
-
         params = {
             "client_id":     self._client_id,
             "grant_type":    GRANT_TYPE_REFRESH,
@@ -144,7 +127,6 @@ class SifelyClient:
         }
         try:
             data = await self._request("POST", API_REFRESH_TOKEN, params=params, auth=False)
-            # Refresh endpoint may use same shape as login
             access  = data.get("token") or data.get("access_token")
             refresh = data.get("refreshToken") or data.get("refresh_token")
             if not access:
@@ -180,7 +162,6 @@ class SifelyClient:
 
         if auth:
             await self._ensure_token()
-            # Sifely uses raw JWT in Authorization header (no "Bearer" prefix)
             headers["Authorization"] = self._access_token  # type: ignore[assignment]
 
         try:
@@ -232,7 +213,7 @@ class SifelyClient:
         data = await self._request("GET", API_LOCK_OPEN_STATE, params={"lockId": lock_id})
         return int(data.get("state", 2))
 
-    # ── Commands ────────────────────────────────────────────────────────────
+    # ── Lock / Unlock ────────────────────────────────────────────────────────
 
     async def unlock(self, lock_id: int) -> bool:
         data = await self._request("POST", API_LOCK_UNLOCK, params={"lockId": lock_id})
@@ -241,6 +222,99 @@ class SifelyClient:
     async def lock(self, lock_id: int) -> bool:
         data = await self._request("POST", API_LOCK_LOCK, params={"lockId": lock_id})
         return self._check_yes_or_not(data, "lock")
+
+    # ── Passcode management ─────────────────────────────────────────────────
+
+    async def get_passcodes(self, lock_id: int) -> list[dict[str, Any]]:
+        """Return all passcodes for a lock.
+
+        Response is a list of PwdListDTO:
+            keyboardPwdId, keyboardPwd, keyboardPwdName,
+            keyboardPwdType, startDate, endDate, senderUsername
+        """
+        data = await self._request(
+            "GET", API_PASSCODE_LIST, params={"lockId": lock_id}
+        )
+        # API returns either a list directly or wrapped in data
+        if isinstance(data, list):
+            return data
+        return data.get("list") or data.get("data") or []
+
+    async def add_passcode(
+        self,
+        lock_id: int,
+        passcode: str,
+        name: str,
+        start_date: int,
+        end_date: int,
+    ) -> dict[str, Any]:
+        """Create a new passcode on a lock via the gateway.
+
+        Args:
+            lock_id:    Sifely lock ID.
+            passcode:   The numeric passcode string (e.g. "123456").
+            name:       A human-readable label (e.g. "Guest - Jane").
+            start_date: Unix timestamp in milliseconds (0 = immediate).
+            end_date:   Unix timestamp in milliseconds (0 = permanent).
+
+        Returns:
+            PwdAddDTO with keyboardPwdId and keyboardPwd.
+        """
+        pwd_type = PWD_TYPE_PERMANENT if end_date == 0 else PWD_TYPE_TIMED
+        params: dict[str, Any] = {
+            "lockId":          lock_id,
+            "keyboardPwd":     passcode,
+            "keyboardPwdName": name,
+            "keyboardPwdType": pwd_type,
+            "startDate":       start_date,
+            "endDate":         end_date,
+            "addType":         REMOTE_OP_TYPE,
+        }
+        result = await self._request("POST", API_PASSCODE_ADD, params=params)
+        _LOGGER.debug("add_passcode result: %s", result)
+        return result
+
+    async def change_passcode(
+        self,
+        lock_id: int,
+        passcode_id: int,
+        new_passcode: str | None = None,
+        new_name: str | None = None,
+        start_date: int | None = None,
+        end_date: int | None = None,
+    ) -> bool:
+        """Update an existing passcode (code, name, and/or validity dates).
+
+        Only the fields you pass are changed; omit any field to leave it unchanged.
+        """
+        params: dict[str, Any] = {
+            "lockId":        lock_id,
+            "keyboardPwdId": passcode_id,
+            "changeType":    REMOTE_OP_TYPE,
+        }
+        if new_passcode is not None:
+            params["newKeyboardPwd"] = new_passcode
+        if new_name is not None:
+            params["keyboardPwdName"] = new_name
+        if start_date is not None:
+            params["startDate"] = start_date
+        if end_date is not None:
+            params["endDate"] = end_date
+
+        result = await self._request("POST", API_PASSCODE_CHANGE, params=params)
+        return self._check_yes_or_not(result, "change_passcode")
+
+    async def delete_passcode(self, lock_id: int, passcode_id: int) -> bool:
+        """Delete a passcode from a lock via the gateway."""
+        params = {
+            "lockId":        lock_id,
+            "keyboardPwdId": passcode_id,
+            "deleteType":    REMOTE_OP_TYPE,
+        }
+        result = await self._request("POST", API_PASSCODE_DELETE, params=params)
+        return self._check_yes_or_not(result, "delete_passcode")
+
+    # ── Helpers ─────────────────────────────────────────────────────────────
 
     def _check_yes_or_not(self, data: dict[str, Any], op: str) -> bool:
         errcode = data.get("errcode", 0)
@@ -256,8 +330,6 @@ class SifelyClient:
         if errcode == -4043:
             raise SifelyApiError("Feature not supported by this lock")
         raise SifelyApiError(f"Error {errcode} during {op}: {errmsg}")
-
-    # ── Gateway helpers ─────────────────────────────────────────────────────
 
     async def get_lock_gateways(self, lock_id: int) -> list[dict[str, Any]]:
         data = await self._request("GET", API_LOCK_GATEWAYS, params={"lockId": lock_id})
