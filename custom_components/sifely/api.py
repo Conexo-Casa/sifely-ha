@@ -28,6 +28,9 @@ _LOGGER = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 15
 
+# Sifely returns code=200 in the JSON body on success (not code=0)
+SIFELY_OK = 200
+
 
 class SifelyAuthError(Exception):
     """Raised when authentication fails."""
@@ -48,12 +51,19 @@ class SifelyGatewayOfflineError(SifelyApiError):
 class SifelyClient:
     """Async client for the Sifely Smart Lock API.
 
-    Authentication flow:
-        1. POST /system/smart/login with client_id + username + md5(password)
-           → returns access_token + refresh_token in response.data map
-        2. Use "Bearer <access_token>" on all subsequent requests
-        3. When token nears expiry, POST /system/smart/oauthToken with
-           grant_type=refresh_token to get a new pair
+    Login response shape (actual, from live API):
+    {
+        "code": 200,
+        "message": "Operation success!",
+        "data": {
+            "token":        "<JWT>",
+            "refreshToken": "<JWT>",
+            "expires_in":   "31536000"
+        }
+    }
+
+    All authenticated requests use:
+        Authorization: <token>    (no "Bearer" prefix — Sifely uses raw JWT)
     """
 
     def __init__(
@@ -80,9 +90,11 @@ class SifelyClient:
     async def login(self) -> None:
         """Perform a full username/password login and store tokens.
 
-        The Sifely login endpoint returns tokens inside response.data as a
-        flat string→string map:
-            { "access_token": "...", "refresh_token": "...", "expires_in": "7200" }
+        Actual response uses:
+            data.token        → access token (raw JWT, no "Bearer" prefix needed)
+            data.refreshToken → refresh token
+            data.expires_in   → seconds as a string
+            code == 200       → success  (NOT 0)
         """
         params = {
             "client_id": self._client_id,
@@ -92,26 +104,25 @@ class SifelyClient:
         _LOGGER.debug("Sifely login: client_id=%r username=%r", self._client_id, self._username)
 
         raw = await self._request("POST", API_LOGIN, params=params, auth=False)
-        _LOGGER.debug("Sifely login raw response: %s", raw)
+        _LOGGER.debug("Sifely login response: %s", raw)
 
-        # Top-level code field: 0 = success
         code = raw.get("code")
-        if code != 0:
+        if code != SIFELY_OK:
             raise SifelyAuthError(
                 f"Login failed (code={code}): {raw.get('message', 'no message')}"
             )
 
-        token_data: dict[str, str] = raw.get("data") or {}
-        access  = token_data.get("access_token")
-        refresh = token_data.get("refresh_token")
+        data: dict[str, str] = raw.get("data") or {}
+        access  = data.get("token")
+        refresh = data.get("refreshToken")
         try:
-            expires_in = int(token_data.get("expires_in", 7200))
+            expires_in = int(data.get("expires_in", 7200))
         except (TypeError, ValueError):
             expires_in = 7200
 
         if not access:
             raise SifelyAuthError(
-                f"Login returned code=0 but no access_token. data={token_data}"
+                f"Login returned code=200 but no token. data={data}"
             )
 
         self._access_token      = access
@@ -120,7 +131,7 @@ class SifelyClient:
         _LOGGER.debug("Sifely login OK, token expires in %ds", expires_in)
 
     async def _refresh_access_token(self) -> None:
-        """Use refresh_token to get a new access_token."""
+        """Use refresh_token to obtain a new access_token."""
         if not self._refresh_token:
             _LOGGER.warning("No refresh token — performing full re-login")
             await self.login()
@@ -133,9 +144,17 @@ class SifelyClient:
         }
         try:
             data = await self._request("POST", API_REFRESH_TOKEN, params=params, auth=False)
-            self._access_token     = data["access_token"]
-            self._refresh_token    = data.get("refresh_token", self._refresh_token)
-            expires_in             = int(data.get("expires_in", 7200))
+            # Refresh endpoint may use same shape as login
+            access  = data.get("token") or data.get("access_token")
+            refresh = data.get("refreshToken") or data.get("refresh_token")
+            if not access:
+                raise SifelyAuthError("No token in refresh response")
+            self._access_token     = access
+            self._refresh_token    = refresh or self._refresh_token
+            try:
+                expires_in = int(data.get("expires_in", 7200))
+            except (TypeError, ValueError):
+                expires_in = 7200
             self._token_expires_at = time.monotonic() + expires_in - 60
         except Exception:
             _LOGGER.warning("Token refresh failed — falling back to full login")
@@ -161,7 +180,8 @@ class SifelyClient:
 
         if auth:
             await self._ensure_token()
-            headers["Authorization"] = f"Bearer {self._access_token}"
+            # Sifely uses raw JWT in Authorization header (no "Bearer" prefix)
+            headers["Authorization"] = self._access_token  # type: ignore[assignment]
 
         try:
             async with self._session.request(
@@ -173,9 +193,9 @@ class SifelyClient:
             ) as resp:
                 _LOGGER.debug("Sifely %s %s → HTTP %d", method, path, resp.status)
                 if resp.status == 401:
-                    raise SifelyAuthError("401 Unauthorized — credentials invalid or token expired")
+                    raise SifelyAuthError("401 Unauthorized")
                 if resp.status == 403:
-                    raise SifelyAuthError("403 Forbidden — check client_id and account permissions")
+                    raise SifelyAuthError("403 Forbidden")
                 if resp.status == 404:
                     raise SifelyLockNotFoundError("404 Not Found")
                 if resp.status >= 400:
@@ -248,9 +268,9 @@ class SifelyClient:
     @property
     def token_state(self) -> dict[str, Any]:
         return {
-            "access_token":      self._access_token,
-            "refresh_token":     self._refresh_token,
-            "token_expires_at":  self._token_expires_at,
+            "access_token":     self._access_token,
+            "refresh_token":    self._refresh_token,
+            "token_expires_at": self._token_expires_at,
         }
 
     def restore_token_state(self, state: dict[str, Any]) -> None:
