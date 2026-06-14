@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Sifely Smart Lock",
-        "description": "Enter your Sifely API credentials. Your Client ID and Client Secret come from the Sifely API Access portal. Your Username and Password are your personal Sifely account login \u2014 the same ones you use in the Sifely mobile app.",
+        "description": "Enter your Sifely API credentials.\n\n**Client ID** and **Client Secret** come from the [Sifely API Access portal](https://app-smart-manager.sifely.com/Login.html).\n\n**Username** and **Password** are your personal Sifely *account* credentials — the same ones you use in the Sifely mobile app.",
         "data": {
           "client_id": "Client ID (from Sifely API portal)",
           "client_secret": "Client Secret (from Sifely API portal)",
@@ -19,9 +19,9 @@
       }
     },
     "error": {
-      "invalid_auth": "Authentication failed. Check that your Client ID, username, and password are correct.",
+      "invalid_auth": "Authentication failed. Check that your Client ID matches exactly what the Sifely portal shows, and that your username and password are correct.",
       "cannot_connect": "Unable to reach the Sifely API. Check your internet connection.",
-      "unknown": "An unexpected error occurred \u2014 check the Home Assistant logs for details."
+      "unknown": "An unexpected error occurred — check the Home Assistant logs for details."
     },
     "abort": {
       "already_configured": "This Sifely account is already configured."
