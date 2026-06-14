@@ -21,7 +21,7 @@ from .const import (
     CONF_CLIENT_ID, CONF_CLIENT_SECRET, CONF_PASSWORD, CONF_USERNAME, DOMAIN,
     SERVICE_ADD_PASSCODE, SERVICE_CHANGE_PASSCODE, SERVICE_DELETE_PASSCODE, SERVICE_LIST_PASSCODES,
 )
-from .coordinator import SifelyDataUpdateCoordinator
+from .coordinator import SifelyDataUpdateCoordinator, SifelySlowCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,26 +57,18 @@ def _now_ms() -> int:
 
 
 def _install_card_file(hass: HomeAssistant) -> None:
-    """Copy the Lovelace card JS to <config>/www/sifely/ (synchronous, best-effort).
-
-    HA serves files from <config>/www/ at /local/.
-    After this runs, the card is available at /local/sifely/sifely-passcode-card.js.
-    Register it once in Settings → Dashboards → Resources as a JavaScript module.
-    """
+    """Copy the Lovelace card JS to <config>/www/sifely/ (synchronous, best-effort)."""
     src = Path(__file__).parent / "www" / CARD_JS
     if not src.exists():
-        _LOGGER.warning("Sifely: card JS not found at %s", src)
         return
-
     dest_dir = Path(hass.config.config_dir) / "www" / "sifely"
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / CARD_JS
         if not dest.exists() or dest.read_bytes() != src.read_bytes():
             dest.write_bytes(src.read_bytes())
-            _LOGGER.info("Sifely: Lovelace card copied to %s", dest)
             _LOGGER.info(
-                "Sifely: Add '%s' as a JavaScript module resource in "
+                "Sifely: card copied. Register '%s' as a JavaScript module in "
                 "Settings → Dashboards → Resources (one-time setup).",
                 RESOURCE_URL,
             )
@@ -104,12 +96,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except aiohttp.ClientError as err:
         raise ConfigEntryNotReady(f"Cannot connect to Sifely API: {err}") from err
 
+    # Fast coordinator — polls open/close state every 3 minutes
     coordinator = SifelyDataUpdateCoordinator(hass, client)
+    await coordinator.async_fetch_lock_list()
     await coordinator.async_config_entry_first_refresh()
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Copy card JS to www/ — simple file operation, no async API calls
+    # Slow coordinator — polls full detail every 30 minutes
+    slow_coordinator = SifelySlowCoordinator(hass, client, coordinator)
+    await slow_coordinator.async_config_entry_first_refresh()
+
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        "coordinator":      coordinator,
+        "slow_coordinator": slow_coordinator,
+        "client":           client,
+    }
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await hass.async_add_executor_job(_install_card_file, hass)
 
     # ── Passcode services ────────────────────────────────────────────────────
@@ -139,10 +141,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         try:
             await client.change_passcode(
                 lock_id, pid,
-                call.data.get(ATTR_PASSCODE),
-                call.data.get(ATTR_PASSCODE_NAME),
-                call.data.get(ATTR_START_DATE),
-                call.data.get(ATTR_END_DATE))
+                call.data.get(ATTR_PASSCODE), call.data.get(ATTR_PASSCODE_NAME),
+                call.data.get(ATTR_START_DATE), call.data.get(ATTR_END_DATE))
             hass.bus.async_fire(f"{DOMAIN}_passcode_changed",
                                 {"lock_id": lock_id, "passcode_id": pid})
         except SifelyApiError as err:
