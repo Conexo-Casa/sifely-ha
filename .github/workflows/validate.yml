@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   validate:
     name: Validate with hassfest
@@ -33,8 +36,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install lint deps
-        run: |
-          pip install ruff
+        run: pip install ruff
 
       - name: Run ruff
         run: ruff check custom_components/sifely/
