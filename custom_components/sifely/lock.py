@@ -48,7 +48,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Sifely lock entities from a config entry."""
-    coordinator: SifelyDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: SifelyDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
 
     entities = [
         SifelyLockEntity(coordinator, lock_id)
