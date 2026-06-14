@@ -149,7 +149,8 @@ class SifelyClient:
                 if resp.status == 404:
                     raise SifelyLockNotFoundError("404 Not Found")
                 if resp.status >= 400:
-                    raise SifelyApiError(f"HTTP {resp.status}: {await resp.text()[:200]}")
+                    body = await resp.text()
+                    raise SifelyApiError(f"HTTP {resp.status}: {body[:200]}")
                 return await resp.json(content_type=None)
         except aiohttp.ClientError as err:
             raise SifelyApiError(f"Network error: {err}") from err
