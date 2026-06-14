@@ -28,7 +28,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Sifely switch entities."""
-    coordinator: SifelyDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: SifelyDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     entities = []
     for lock_id in coordinator.data:
         entities.append(AutoLockSwitch(coordinator, lock_id))
