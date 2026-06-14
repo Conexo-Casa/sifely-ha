@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -28,8 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.LOCK, Platform.SWITCH, Platform.SELECT]
 
-# Lovelace card JS filename (served from /local/sifely/)
-CARD_JS = "sifely-passcode-card.js"
+CARD_JS      = "sifely-passcode-card.js"
 RESOURCE_URL = f"/local/sifely/{CARD_JS}"
 
 ADD_PASSCODE_SCHEMA = vol.Schema({
@@ -58,46 +56,32 @@ def _now_ms() -> int:
     return int(datetime.now().timestamp() * 1000)
 
 
-async def _install_lovelace_card(hass: HomeAssistant) -> None:
-    """Copy the Lovelace card JS into www/sifely/ and register it as a resource.
+def _install_card_file(hass: HomeAssistant) -> None:
+    """Copy the Lovelace card JS to <config>/www/sifely/ (synchronous, best-effort).
 
-    HA serves files from <config>/www/ at /local/. We copy the bundled JS there
-    once on setup so the card is always in sync with the installed integration version.
+    HA serves files from <config>/www/ at /local/.
+    After this runs, the card is available at /local/sifely/sifely-passcode-card.js.
+    Register it once in Settings → Dashboards → Resources as a JavaScript module.
     """
-    # Source: bundled in custom_components/sifely/www/
     src = Path(__file__).parent / "www" / CARD_JS
     if not src.exists():
-        _LOGGER.warning("Sifely card JS not found at %s — skipping resource install", src)
+        _LOGGER.warning("Sifely: card JS not found at %s", src)
         return
 
-    # Destination: <config>/www/sifely/
     dest_dir = Path(hass.config.config_dir) / "www" / "sifely"
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / CARD_JS
-
-    # Copy if missing or outdated
     try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / CARD_JS
         if not dest.exists() or dest.read_bytes() != src.read_bytes():
             dest.write_bytes(src.read_bytes())
-            _LOGGER.info("Sifely Lovelace card installed to %s", dest)
+            _LOGGER.info("Sifely: Lovelace card copied to %s", dest)
+            _LOGGER.info(
+                "Sifely: Add '%s' as a JavaScript module resource in "
+                "Settings → Dashboards → Resources (one-time setup).",
+                RESOURCE_URL,
+            )
     except OSError as err:
-        _LOGGER.warning("Could not copy Sifely card JS: %s", err)
-        return
-
-    # Register as a Lovelace resource (idempotent)
-    try:
-        resources = hass.data.get("lovelace", {}).get("resources")
-        if resources is not None:
-            existing = [r for r in await resources.async_get_info()
-                        if r.get("url") == RESOURCE_URL]
-            if not existing:
-                await resources.async_create_item(
-                    {"res_type": "module", "url": RESOURCE_URL}
-                )
-                _LOGGER.info("Registered Sifely Lovelace resource: %s", RESOURCE_URL)
-    except Exception as err:
-        # Non-fatal — user can register manually if needed
-        _LOGGER.debug("Could not auto-register Lovelace resource: %s", err)
+        _LOGGER.warning("Sifely: could not copy card JS: %s", err)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -112,6 +96,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     if token_state := entry.data.get("token_state"):
         client.restore_token_state(token_state)
+
     try:
         await client.login()
     except SifelyAuthError as err:
@@ -124,8 +109,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Install Lovelace card (best-effort, non-blocking)
-    hass.async_create_task(_install_lovelace_card(hass))
+    # Copy card JS to www/ — simple file operation, no async API calls
+    await hass.async_add_executor_job(_install_card_file, hass)
 
     # ── Passcode services ────────────────────────────────────────────────────
 
