@@ -205,10 +205,14 @@ class SifelyClient:
                               new_passcode: str | None = None, new_name: str | None = None,
                               start_date: int | None = None, end_date: int | None = None) -> bool:
         params: dict[str, Any] = {"lockId": lock_id, "keyboardPwdId": passcode_id, "changeType": REMOTE_OP_TYPE}
-        if new_passcode is not None: params["newKeyboardPwd"] = new_passcode
-        if new_name is not None:     params["keyboardPwdName"] = new_name
-        if start_date is not None:   params["startDate"] = start_date
-        if end_date is not None:     params["endDate"] = end_date
+        if new_passcode is not None:
+            params["newKeyboardPwd"] = new_passcode
+        if new_name is not None:
+            params["keyboardPwdName"] = new_name
+        if start_date is not None:
+            params["startDate"] = start_date
+        if end_date is not None:
+            params["endDate"] = end_date
         return self._check_yon(await self._request("POST", API_PASSCODE_CHANGE, params=params), "change_passcode")
 
     async def delete_passcode(self, lock_id: int, passcode_id: int) -> bool:
