@@ -35,7 +35,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Sifely select entities."""
-    coordinator: SifelyDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: SifelyDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     async_add_entities([
         SoundVolumeSelect(coordinator, lock_id)
         for lock_id in coordinator.data
