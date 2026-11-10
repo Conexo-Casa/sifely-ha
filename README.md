@@ -1,6 +1,6 @@
 # Sifely Smart Lock — Home Assistant Integration
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![Home Assistant Marketplace](https://img.shields.io/badge/HA%20Marketplace-custom%20repository-41BDF5.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Conexo-Casa&repository=sifely-ha&category=integration)
 [![GitHub Release](https://img.shields.io/github/release/Conexo-Casa/sifely-ha.svg)](https://github.com/Conexo-Casa/sifely-ha/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -24,7 +24,7 @@ scripts.
 | Battery level attribute | ✅ |
 | Gateway online/offline awareness | ✅ |
 | Multiple locks per account | ✅ |
-| HACS installation | ✅ |
+| Marketplace / HACS installation | ✅ |
 | Config-flow UI setup | ✅ |
 | Automatic token refresh | ✅ |
 
@@ -42,15 +42,31 @@ scripts.
 
 ## Installation
 
-### Option A — HACS (recommended)
+### Marketplace (Home Assistant 2026.11 and newer)
 
-1. Open HACS in your Home Assistant instance.
-2. Select **Integrations** → **⋮ (menu)** → **Custom repositories**.
-3. Add `https://github.com/Conexo-Casa/sifely-ha` as an **Integration**.
-4. Search for **Sifely Smart Lock** and click **Download**.
-5. Restart Home Assistant.
+[![Open your Home Assistant instance and show this repository in the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Conexo-Casa&repository=sifely-ha&category=integration)
 
-### Option B — Manual
+Or by hand:
+
+1. Go to **Settings → Marketplace**.
+2. Select **Add from link** (top right) and enter `Conexo-Casa/sifely-ha`.
+   The first time, Home Assistant asks you to connect GitHub. That is a one-time,
+   read-only sign-in on github.com.
+3. Open **Sifely Smart Lock** and select **Install**. The setup screen opens right away; a first
+   install doesn't need a restart.
+
+Updates show up under **Settings → Updates**. After an update, Home Assistant shows a
+repair that offers to restart.
+
+### HACS (Home Assistant 2026.10 and older)
+
+1. HACS → **Integrations** → **⋮** → **Custom repositories**.
+2. Add `https://github.com/Conexo-Casa/sifely-ha`, category **Integration**.
+3. Download **Sifely Smart Lock**, then restart Home Assistant.
+
+An existing HACS install moves to the Marketplace by itself when you upgrade to 2026.11.
+
+### Manual
 
 1. Download the [latest release](https://github.com/Conexo-Casa/sifely-ha/releases/latest).
 2. Copy the `custom_components/sifely` directory into your HA
