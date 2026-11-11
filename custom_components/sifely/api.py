@@ -13,6 +13,7 @@ import aiohttp
 
 from .const import (
     API_BASE_URL,
+    API_GET_PASSAGE_MODE,
     API_LOCK_DETAIL,
     API_LOCK_GATEWAYS,
     API_LOCK_LIST,
@@ -26,7 +27,6 @@ from .const import (
     API_PASSCODE_LIST,
     API_REFRESH_TOKEN,
     API_SET_AUTO_LOCK,
-    API_GET_PASSAGE_MODE,
     API_SET_PASSAGE_MODE,
     API_UPDATE_SETTING,
     GRANT_TYPE_REFRESH,
@@ -114,7 +114,7 @@ class SifelyClient:
             self._access_token     = access
             self._refresh_token    = data.get("refreshToken") or data.get("refresh_token") or self._refresh_token
             self._token_expires_at = time.monotonic() + int(data.get("expires_in", 7200)) - 60
-        except Exception:
+        except Exception:  # noqa: BLE001 - any refresh failure falls back to a full login
             await self.login()
 
     async def _ensure_token(self) -> None:

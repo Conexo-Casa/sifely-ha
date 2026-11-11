@@ -93,6 +93,9 @@ class SifelyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=STEP_USER_DATA_SCHEMA,
             errors=errors,
+            description_placeholders={
+                "portal_url": "https://app-smart-manager.sifely.com/Login.html",
+            },
         )
 
     async def async_step_reauth(
