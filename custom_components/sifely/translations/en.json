@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Sifely Smart Lock",
-        "description": "Enter your Sifely API credentials.\n\n**Client ID** and **Client Secret** come from the [Sifely API Access portal](https://app-smart-manager.sifely.com/Login.html).\n\n**Username** and **Password** are your personal Sifely *account* credentials — the same ones you use in the Sifely mobile app.",
+        "description": "Enter your Sifely API credentials.\n\n**Client ID** and **Client Secret** come from the [Sifely API Access portal]({portal_url}).\n\n**Username** and **Password** are your personal Sifely *account* credentials — the same ones you use in the Sifely mobile app.",
         "data": {
           "client_id": "Client ID (from Sifely API portal)",
           "client_secret": "Client Secret (from Sifely API portal)",
